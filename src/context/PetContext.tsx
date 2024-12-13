@@ -49,7 +49,7 @@ export const PetProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     fetchPets();
-  }, [user, userData]); // Refetch when auth state changes
+  }, [user, userData]); 
 
   const addPet = async (
     petData: Omit<Pet, "id" | "createdAt" | "updatedAt" | "userId">

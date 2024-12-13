@@ -37,7 +37,6 @@ yarn-error.*
 
 # IDE
 .idea/
-.vscode/
 *.swp
 *.swo
 
@@ -58,3 +57,7 @@ coverage/
 # Expo Client builds
 /android
 /ios 
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore

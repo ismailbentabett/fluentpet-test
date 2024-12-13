@@ -32,7 +32,6 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
-// Set persistence to local
 setPersistence(auth, browserLocalPersistence).catch(console.error);
 
 interface AuthResponse {
