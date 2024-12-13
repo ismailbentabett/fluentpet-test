@@ -4,7 +4,7 @@ import { Pet } from "../types/pet";
 
 
 
-export const usePetContext = () => {
+export const usePets = () => {
   const context = useContext(PetContext);
 
   if (!context) {

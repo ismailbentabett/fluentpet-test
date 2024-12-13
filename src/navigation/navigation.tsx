@@ -9,20 +9,25 @@ import React from "react";
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-export const NavigationWrapper = () => {
-  const { user, loading } = useAuth();
+const LoadingScreen = () => (
+  <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+    <ActivityIndicator size="large" color="#4CAF50" />
+  </View>
+);
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-      </View>
-    );
+export const NavigationWrapper = () => {
+  const { user, userData, initializing } = useAuth();
+
+  if (initializing) {
+    return <LoadingScreen />;
   }
+
+  const isAuthenticated = !!user && !!userData;
 
   return (
     <Stack.Navigator>
-      {!user ? (
+      {!isAuthenticated ? (
+        // Auth Stack
         <>
           <Stack.Screen
             name="Login"
@@ -36,6 +41,7 @@ export const NavigationWrapper = () => {
           />
         </>
       ) : (
+        // App Stack - Only accessible when authenticated
         <Stack.Screen
           name="Main"
           component={MainScreen}

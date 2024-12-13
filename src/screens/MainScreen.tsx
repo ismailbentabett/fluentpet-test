@@ -16,84 +16,44 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { useAuth } from "../hooks/useAuth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImagePicker from "expo-image-picker";
 import { Formik } from "formik";
 import * as Yup from "yup";
 import { RootStackParamList } from "../types";
-import { UserData } from "../types/auth";
+import { usePets } from "../hooks/usePets";
+import { Pet } from "../types/pet";
+import { Picker } from "@react-native-picker/picker";
 
 type MainScreenNavigationProp = StackNavigationProp<RootStackParamList, "Main">;
-
-interface Pet {
-  id: string;
-  name: string;
-  age: string;
-  description?: string;
-  photo?: string;
-}
 
 const PetSchema = Yup.object().shape({
   name: Yup.string().required("Name is required"),
   age: Yup.string().required("Age is required"),
+  category: Yup.string().required("Category is required"),
+  breed: Yup.string().required("Breed is required"),
   description: Yup.string(),
   photo: Yup.string(),
 });
 
+const petCategories = ["Dog", "Cat", "Bird", "Other"];
+
 const MainScreen: React.FC = () => {
   const navigation = useNavigation<MainScreenNavigationProp>();
-  const { signOut } = useAuth();
-  const [user, setUser] = useState<UserData | null>(null);
-  const [pets, setPets] = useState<Pet[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { signOut, userData, user } = useAuth();
+  const { pets, loading, error, addPet, updatePet, deletePet, searchPets } = usePets();
   const [editingPet, setEditingPet] = useState<Pet | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [ageFilter, setAgeFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   useEffect(() => {
-    const initializeScreen = async () => {
-      await checkAuth();
-      await loadPets();
-      setLoading(false);
-    };
-    initializeScreen();
-  }, []);
-
-  const checkAuth = async () => {
-    const userData = await AsyncStorage.getItem("userData");
-    if (userData) {
-      setUser(JSON.parse(userData));
-    } else {
-      navigation.replace("Login");
+    if (searchQuery || categoryFilter) {
+      searchPets(searchQuery);
     }
-  };
-
-  const loadPets = async () => {
-    try {
-      const storedPets = await AsyncStorage.getItem("pets");
-      if (storedPets) {
-        setPets(JSON.parse(storedPets));
-      }
-    } catch (error) {
-      console.error("Failed to load pets:", error);
-      Alert.alert("Error", "Failed to load pets. Please try again.");
-    }
-  };
-
-  const savePets = async (updatedPets: Pet[]) => {
-    try {
-      await AsyncStorage.setItem("pets", JSON.stringify(updatedPets));
-    } catch (error) {
-      console.error("Failed to save pets:", error);
-      Alert.alert("Error", "Failed to save pets. Please try again.");
-    }
-  };
+  }, [searchQuery, categoryFilter]);
 
   const handleSignOut = async () => {
     try {
       await signOut();
-      await AsyncStorage.removeItem("userData");
-      navigation.replace("Login");
     } catch (error) {
       console.error("Sign out error:", error);
       Alert.alert("Error", "Failed to sign out. Please try again.");
@@ -101,23 +61,17 @@ const MainScreen: React.FC = () => {
   };
 
   const handleSubmit = async (
-    values: Omit<Pet, "id">,
+    values: Omit<Pet, "id" | "createdAt" | "updatedAt" | "userId">,
     { resetForm }: { resetForm: () => void }
   ) => {
     try {
-      let updatedPets: Pet[];
       if (editingPet) {
-        updatedPets = pets.map((pet) =>
-          pet.id === editingPet.id ? { ...pet, ...values, id: pet.id } : pet
-        );
+        await updatePet(editingPet.id!, values);
         Alert.alert("Success", "Pet updated successfully");
       } else {
-        const newPet: Pet = { ...values, id: Date.now().toString() };
-        updatedPets = [...pets, newPet];
+        await addPet(values);
         Alert.alert("Success", "Pet added successfully");
       }
-      setPets(updatedPets);
-      await savePets(updatedPets);
       resetForm();
       setEditingPet(null);
     } catch (error) {
@@ -138,9 +92,7 @@ const MainScreen: React.FC = () => {
             style: "destructive",
             onPress: async () => {
               try {
-                const updatedPets = pets.filter((pet) => pet.id !== id);
-                setPets(updatedPets);
-                await savePets(updatedPets);
+                await deletePet(id);
                 Alert.alert("Success", "Pet deleted successfully");
               } catch (error) {
                 console.error("Delete pet error:", error);
@@ -151,14 +103,13 @@ const MainScreen: React.FC = () => {
         ]
       );
     },
-    [pets]
+    [deletePet]
   );
 
   const pickImage = async (
     setFieldValue: (field: string, value: any) => void
   ) => {
-    const permissionResult =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (permissionResult.granted === false) {
       Alert.alert(
         "Permission Required",
@@ -182,20 +133,25 @@ const MainScreen: React.FC = () => {
   const filteredPets = pets.filter(
     (pet) =>
       pet.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-      (ageFilter === "" || pet.age === ageFilter)
+      (categoryFilter === "" || pet.category === categoryFilter)
   );
 
   const renderPetItem = useCallback(
     ({ item }: { item: Pet }) => (
       <View style={styles.petItem}>
         {item.photo && (
-          <Image source={{ uri: item.photo }} style={styles.petPhoto} />
+          <Image
+            source={{ uri: item.photo }}
+            style={styles.petPhoto}
+          />
         )}
-        <Text style={styles.petName}>Name: {item.name}</Text>
-        <Text style={styles.petAge}>Age: {item.age}</Text>
+        <Text style={styles.petName}>{item.name}</Text>
+        <Text style={styles.petInfo}>Age: {item.age}</Text>
+        <Text style={styles.petInfo}>Category: {item.category}</Text>
+        <Text style={styles.petInfo}>Breed: {item.breed}</Text>
         {item.description && (
-          <Text style={styles.petDescription}>
-            Description: {item.description}
+          <Text style={styles.petDescription} numberOfLines={2}>
+            {item.description}
           </Text>
         )}
         <View style={styles.buttonContainer}>
@@ -206,7 +162,7 @@ const MainScreen: React.FC = () => {
             <Text style={styles.buttonText}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => handleDelete(item.id)}
+            onPress={() => handleDelete(item.id!)}
             style={styles.deleteButton}
           >
             <Text style={styles.buttonText}>Delete</Text>
@@ -225,14 +181,11 @@ const MainScreen: React.FC = () => {
     );
   }
 
-  if (!user) {
+  if (!user || !userData) {
     return (
       <View style={styles.centerContainer}>
         <Text>No user data found. Please log in again.</Text>
-        <TouchableOpacity
-          onPress={() => navigation.replace("Login")}
-          style={styles.button}
-        >
+        <TouchableOpacity onPress={handleSignOut} style={styles.button}>
           <Text style={styles.buttonText}>Go to Login</Text>
         </TouchableOpacity>
       </View>
@@ -262,18 +215,21 @@ const MainScreen: React.FC = () => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Filter by age"
-            value={ageFilter}
-            onChangeText={setAgeFilter}
-            keyboardType="numeric"
-          />
+          <Picker
+            selectedValue={categoryFilter}
+            onValueChange={(itemValue) => setCategoryFilter(itemValue)}
+            style={styles.picker}
+          >
+            <Picker.Item label="All Categories" value="" />
+            {petCategories.map((category) => (
+              <Picker.Item key={category} label={category} value={category} />
+            ))}
+          </Picker>
         </View>
 
         <Formik
           initialValues={
-            editingPet || { name: "", age: "", description: "", photo: "" }
+            editingPet || { name: "", age: "", category: "", breed: "", description: "", photo: "" }
           }
           validationSchema={PetSchema}
           onSubmit={handleSubmit}
@@ -318,6 +274,37 @@ const MainScreen: React.FC = () => {
                 <Text style={styles.errorText}>{errors.age}</Text>
               )}
 
+              <Picker
+                selectedValue={values.category}
+                onValueChange={(itemValue) => setFieldValue("category", itemValue)}
+                style={[
+                  styles.input,
+                  touched.category && errors.category && styles.inputError,
+                ]}
+              >
+                <Picker.Item label="Select Category" value="" />
+                {petCategories.map((category) => (
+                  <Picker.Item key={category} label={category} value={category} />
+                ))}
+              </Picker>
+              {touched.category && errors.category && (
+                <Text style={styles.errorText}>{errors.category}</Text>
+              )}
+
+              <TextInput
+                style={[
+                  styles.input,
+                  touched.breed && errors.breed && styles.inputError,
+                ]}
+                value={values.breed}
+                onChangeText={handleChange("breed")}
+                onBlur={handleBlur("breed")}
+                placeholder="Pet Breed"
+              />
+              {touched.breed && errors.breed && (
+                <Text style={styles.errorText}>{errors.breed}</Text>
+              )}
+
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={values.description}
@@ -345,7 +332,7 @@ const MainScreen: React.FC = () => {
               )}
 
               <TouchableOpacity
-                style={styles.button}
+                style={styles.submitButton}
                 onPress={() => handleSubmit()}
               >
                 <Text style={styles.buttonText}>
@@ -360,7 +347,7 @@ const MainScreen: React.FC = () => {
           {filteredPets.length > 0 ? (
             <FlatList
               data={filteredPets}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.id!}
               renderItem={renderPetItem}
             />
           ) : (
@@ -396,14 +383,15 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerText: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "bold",
     color: "#333",
   },
   signOutButton: {
     backgroundColor: "#f44336",
-    padding: 8,
-    borderRadius: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   signOutButtonText: {
     color: "white",
@@ -414,14 +402,20 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 5,
+    padding: 12,
+    borderRadius: 25,
     marginBottom: 8,
+    fontSize: 16,
+  },
+  picker: {
+    backgroundColor: "#fff",
+    marginBottom: 8,
+    borderRadius: 25,
   },
   formContainer: {
     backgroundColor: "#fff",
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 15,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -434,7 +428,7 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 12,
     marginBottom: 16,
-    borderRadius: 5,
+    borderRadius: 25,
     backgroundColor: "#fff",
     fontSize: 16,
   },
@@ -448,7 +442,7 @@ const styles = StyleSheet.create({
   photoButton: {
     backgroundColor: "#2196F3",
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 25,
     alignItems: "center",
     marginBottom: 16,
   },
@@ -460,14 +454,13 @@ const styles = StyleSheet.create({
   previewPhoto: {
     width: "100%",
     height: 200,
-    resizeMode: "cover",
-    borderRadius: 5,
+    borderRadius: 15,
     marginBottom: 16,
   },
-  button: {
+  submitButton: {
     backgroundColor: "#4CAF50",
     padding: 16,
-    borderRadius: 5,
+    borderRadius: 25,
     elevation: 2,
   },
   buttonText: {
@@ -482,7 +475,7 @@ const styles = StyleSheet.create({
   petItem: {
     padding: 16,
     backgroundColor: "#fff",
-    borderRadius: 8,
+    borderRadius: 15,
     marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -492,45 +485,44 @@ const styles = StyleSheet.create({
   },
   petPhoto: {
     width: "100%",
-    height: 200,
-    resizeMode: "cover",
-    borderRadius: 5,
+    height: 150,
+    borderRadius: 10,
     marginBottom: 8,
   },
   petName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
     marginBottom: 4,
+    color: "#333",
   },
-  petAge: {
+  petInfo: {
     fontSize: 16,
-    marginBottom: 4,
+    marginBottom: 2,
+    color: "#666",
   },
   petDescription: {
     fontSize: 14,
-    color: "#666",
+    color: "#888",
+    marginTop: 4,
+    marginBottom: 8,
   },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    marginTop: 12,
+    marginTop: 8,
   },
   editButton: {
     backgroundColor: "#2196F3",
-    padding: 8,
-    borderRadius: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
     marginRight: 8,
-    minWidth: 70,
-    justifyContent: "center",
-    alignItems: "center",
   },
   deleteButton: {
     backgroundColor: "#f44336",
-    padding: 8,
-    borderRadius: 5,
-    minWidth: 70,
-    justifyContent: "center",
-    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
   },
   errorText: {
     color: "#f44336",
@@ -539,10 +531,11 @@ const styles = StyleSheet.create({
   },
   emptyListText: {
     textAlign: "center",
-    fontSize: 16,
+    fontSize: 18,
     color: "#666",
     marginTop: 20,
   },
 });
 
 export default MainScreen;
+
