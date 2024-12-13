@@ -140,7 +140,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
-  // Initialize auth state from persistence and subscribe to Firebase auth changes
   useEffect(() => {
     const initializeAuth = async () => {
       await loadPersistedAuthState();

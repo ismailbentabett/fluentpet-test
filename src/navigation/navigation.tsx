@@ -27,7 +27,6 @@ export const NavigationWrapper = () => {
   return (
     <Stack.Navigator>
       {!isAuthenticated ? (
-        // Auth Stack
         <>
           <Stack.Screen
             name="Login"
@@ -41,7 +40,6 @@ export const NavigationWrapper = () => {
           />
         </>
       ) : (
-        // App Stack - Only accessible when authenticated
         <Stack.Screen
           name="Main"
           component={MainScreen}

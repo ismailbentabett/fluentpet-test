@@ -43,7 +43,6 @@ import { Pet } from '../types/pet';
         const user = auth.currentUser;
         if (!user) throw new Error('User not authenticated');
   
-        // Check for duplicate name
         const duplicateQuery = query(
           collection(db, this.collection),
           where('userId', '==', user.uid),
@@ -77,12 +76,10 @@ import { Pet } from '../types/pet';
         const user = auth.currentUser;
         if (!user) throw new Error('User not authenticated');
   
-        // Check if pet exists and belongs to user
         const petDoc = await getDoc(doc(db, this.collection, id));
         if (!petDoc.exists()) throw new Error('Pet not found');
         if (petDoc.data()?.userId !== user.uid) throw new Error('Unauthorized');
   
-        // Check for duplicate name if name is being updated
         if (pet.name) {
           const duplicateQuery = query(
             collection(db, this.collection),
@@ -117,7 +114,6 @@ import { Pet } from '../types/pet';
         const user = auth.currentUser;
         if (!user) throw new Error('User not authenticated');
   
-        // Check if pet exists and belongs to user
         const petDoc = await getDoc(doc(db, this.collection, id));
         if (!petDoc.exists()) throw new Error('Pet not found');
         if (petDoc.data()?.userId !== user.uid) throw new Error('Unauthorized');

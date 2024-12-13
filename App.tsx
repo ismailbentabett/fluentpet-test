@@ -1,4 +1,3 @@
-// App.tsx
 import { NavigationContainer } from "@react-navigation/native";
 import React from "react";
 import { SafeAreaView, StatusBar } from "react-native";
